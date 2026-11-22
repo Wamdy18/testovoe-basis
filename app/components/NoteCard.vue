@@ -42,8 +42,8 @@ const remaining = computed(() => Math.max(0, props.note.todos.length - props.max
         <div class="card__main">
             <ul v-if="previewTodos.length > 0" class="card__todos">
                 <li v-for="todo in previewTodos" :key="todo.id" class="card__todo">
-                    <span class="card__mark">
-                        <svg v-if="todo.completed" viewBox="0 0 12 10" width="10" height="10" fill="none">
+                    <span class="card__mark" :class="{ 'card__mark--done': todo.completed }" >
+                        <svg v-if="todo.completed"viewBox="0 0 12 10" width="10" height="10" fill="none">
                             <path d="M1 5.2 4.3 8.5 11 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
