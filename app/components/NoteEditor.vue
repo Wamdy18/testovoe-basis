@@ -1,4 +1,104 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import type { Note, TodoItem } from '~/types/types'
+import { generateId } from '~/utils/id'
+
+const props = defineProps<{
+  note: Note
+  deletedExternally: boolean
+}>()
+
+const store = useNotesStore()
+const toast = useToast()
+
+const draft = useNoteDraft(props.note)
+
+useHotkeys([
+  { code: 'KeyZ', handler: () => draft.undo() },
+  { code: 'KeyZ', shift: true, handler: () => draft.redo() },
+])
+
+
+const title = computed(() => draft.current.value.title)
+const canSave = computed(() => title.value.trim() !== '' && !props.deletedExternally)
+
+function onTitleBlur(): void {
+  draft.commitIfChanged()
+}
+
+
+const newTodoText = ref('')
+
+function addTodo(): void {
+  const text = newTodoText.value.trim()
+  if (!text) return
+
+  const todo: TodoItem = { id: generateId(), text, completed: false }
+  draft.current.value.todos = [...draft.current.value.todos, todo]
+  newTodoText.value = ''
+  draft.commit()
+}
+
+function removeTodo(id: string): void {
+  draft.current.value.todos = draft.current.value.todos.filter((t) => t.id !== id)
+  draft.commit()
+}
+
+function toggleTodo(id: string): void {
+  const todo = draft.current.value.todos.find((t) => t.id === id)
+  if (!todo) return
+  todo.completed = !todo.completed
+  draft.commit()
+}
+
+function onTodoTextBlur(): void {
+  draft.commitIfChanged()
+}
+
+function onAddKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    addTodo()
+  }
+}
+
+const showCancelConfirm = ref(false)
+const showDeleteConfirm = ref(false)
+const showRestoreDraft = ref(draft.hasRestorableDraft)
+
+function save(): void {
+  if (props.deletedExternally) {
+    toast.show('Нельзя сохранить: заметка удалена в другой вкладке', 'error')
+    return
+  }
+  if (!canSave.value) return
+
+  draft.apply()
+  store.updateNote(props.note.id, draft.current.value)
+  toast.show('Заметка сохранена', 'success')
+  navigateTo('/')
+}
+
+function cancel(): void {
+  draft.discard()
+  navigateTo('/')
+}
+
+function confirmDelete(): void {
+  store.removeNote(props.note.id)
+  toast.show('Заметка удалена', 'success')
+  navigateTo('/')
+}
+
+function onRestore(): void {
+  draft.restore()
+  showRestoreDraft.value = false
+}
+
+function onDiscardRestore(): void {
+  draft.discard()
+  showRestoreDraft.value = false
+}
 </script>
 
 <template>
@@ -7,35 +107,56 @@
             <div class="editor__topbar-left">
                 <button class="editor__back" @click="navigateTo('/')">Назад</button>
                 <div class="editor__history">
-                    <button class="editor__history-btn">
+                    <button 
+                      @click="draft.undo()"
+                      :disabled="!draft.canUndo.value"
+                      class="editor__history-btn">
                       Отменить(Ctrl+Z)</button>
-                    <button class="editor__history-btn">Повторить(Ctrl+Shift+Z)</button>
+                    <button 
+                      @click="draft.redo()"
+                      :disabled="!draft.canRedo.value"
+                      class="editor__history-btn">Повторить(Ctrl+Shift+Z)</button>
                 </div>
             </div>
-            <div v-if="true" class="editor__topbar-right">
+            <div v-if="draft.hasUnsavedChanges.value" class="editor__topbar-right">
                 <span class="editor__badge">
                     Не сохранено
                 </span>
             </div>
         </header>
+
+        <div v-if="deletedExternally" class="editor__warning" role="alert">
+          Заметка была удалена в другой вкладке. Сохранение заблокировано.
+        </div>
+
         <main class="editor__main">
-            <TextField />
+            <TextField
+              v-model="draft.current.value.title"
+              multiline
+              size="lg"
+              aria-label="Название заметки"
+              placeholder="Название заметки"
+              @blur="onTitleBlur"
+            />
             <section class="editor__todos">
               <h2 class="editor__section-title">Задачи</h2>
 
-              <ul v-if="true" class="editor__todo-list">
-                <li v-for="todo in [1,2,3]" :key="todo" class="editor__todo">
+              <ul v-if="draft.current.value.todos.length > 0" class="editor__todo-list">
+                <li v-for="todo in draft.current.value.todos" :key="todo.id" class="editor__todo">
                   <Checkbox
-                  :modelValue="todo == 1 ? true : false"
+                  :modelValue="todo.completed"
+                  @update:model-value="toggleTodo(todo.id)"
                   />
                   <input
-                    value="Задача"
+                    v-model="todo.text"
                     class="editor__todo-text"
                     type="text"
+                    @blur="onTodoTextBlur"
                   />
                   <button
                     type="button"
                     class="editor__remove"
+                    @click="removeTodo(todo.id)"
                   >
                     Удалить
                   </button>
@@ -45,20 +166,48 @@
 
               <div class="editor__add">
                 <TextField
+                  v-model="newTodoText"
                   placeholder="Новая задача"
-                  aria-label="Новая задача"
+                  @keydown="onAddKeydown"
                 />
-                <Button variant="secondary">Добавить</Button>
+                <Button variant="secondary" @click="addTodo">Добавить</Button>
               </div>
-              <footer class="editor__actions">
-                <Button variant="danger">Удалить заметку</Button>
-                <div class="editor__actions-right">
-                  <Button variant="secondary">Отменить редактирование</Button>
-                  <Button>Сохранить</Button>
-                </div>
-              </footer>
             </section>
         </main>
+        <footer class="editor__actions">
+          <Button variant="danger" @click="showDeleteConfirm = true">Удалить заметку</Button>
+          <div class="editor__actions-right">
+            <Button variant="secondary" @click="showCancelConfirm = true">Отменить редактирование</Button>
+            <Button :disabled="!canSave" @click="save">Сохранить</Button>
+          </div>
+        </footer>
+
+    <ConfirmDialog
+      v-model="showCancelConfirm"
+      title="Отменить редактирование?"
+      message="Все несохранённые изменения будут потеряны."
+      confirm-text="Отменить"
+      @confirm="cancel"
+    />
+
+    <ConfirmDialog
+      v-model="showDeleteConfirm"
+      title="Удалить заметку?"
+      message="Заметка будет удалена безвозвратно."
+      confirm-text="Удалить"
+      danger
+      @confirm="confirmDelete"
+    />
+
+    <ConfirmDialog
+      v-model="showRestoreDraft"
+      title="Восстановить черновик?"
+      message="Найден несохранённый черновик этой заметки. Восстановить его?"
+      confirm-text="Восстановить"
+      cancel-text="Не восстанавливать"
+      @confirm="onRestore"
+      @cancel="onDiscardRestore"
+    />
     </div>
 </template>
 
@@ -122,7 +271,14 @@
     border-radius: var(--border-radius-sm);
   }
 
-
+  &__warning {
+    padding: var(--space-3) var(--space-4);
+    font-size: 14px;
+    color: var(--color-danger);
+    background: var(--color-danger-soft);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--border-radius-md);
+  }
 
   &__main {
     display: flex;
@@ -220,5 +376,23 @@
     gap: var(--space-2);
   }
 
+}
+
+@media (max-width: 640px) {
+  .editor {
+
+    &__topbar-left {
+      flex-direction: column;
+      align-items: start;
+    }
+    &__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__actions-right {
+      flex-direction: column-reverse;
+    }
+  }
 }
 </style>

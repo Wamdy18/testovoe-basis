@@ -9,3 +9,8 @@ export interface Note {
     title: string
     todos: TodoItem[]
 }
+
+export interface PersistedState {
+  version: number
+  notes: Note[]
+}

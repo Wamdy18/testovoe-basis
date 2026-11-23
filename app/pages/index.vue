@@ -1,129 +1,40 @@
 <script setup lang="ts">
-const notes = reactive([
-    {
-        id: '1',
-        title: 'Список продуктов',
-        todos: [
-            {
-                id: '1',
-                text: 'Хлеб',
-                completed: true,
-            },
-            {
-                id: '2',
-                text: 'Колбаса',
-                completed: false,
-            },
-            {
-                id: '3',
-                text: 'Свекла',
-                completed: false,
-            },
-            {
-                id: '4',
-                text: 'Мандарины',
-                completed: false,
-            },
-            {
-                id: '5',
-                text: 'Бананы',
-                completed: false,
-            },
-            {
-                id: '6',
-                text: 'Кефир',
-                completed: false,
-            },
-        ]
-    },
-    {
-        id: '2',
-        title: 'Список продуктов 2',
-        todos: []
-    },
-    {
-        id: '3',
-        title: 'Список продуктов 3',
-        todos: [
-            {
-                id: '1',
-                text: 'Хлеб',
-                completed: false,
-            },
-            {
-                id: '2',
-                text: 'Колбаса',
-                completed: false,
-            },
-            {
-                id: '3',
-                text: 'Свекла',
-                completed: false,
-            },
-            {
-                id: '4',
-                text: 'Мандарины',
-                completed: false,
-            },
-            {
-                id: '5',
-                text: 'Бананы',
-                completed: false,
-            },
-        ]
-    },
-    {
-        id: '4',
-        title: 'Список продуктов 4',
-        todos: [
-            {
-                id: '1',
-                text: 'Хлеб',
-                completed: false,
-            },
-            {
-                id: '2',
-                text: 'Колбаса',
-                completed: false,
-            },
-            {
-                id: '3',
-                text: 'Свекла',
-                completed: false,
-            },
-            {
-                id: '4',
-                text: 'Мандарины',
-                completed: false,
-            },
-            {
-                id: '5',
-                text: 'Бананы',
-                completed: false,
-            },
-            {
-                id: '6',
-                text: 'Кефир',
-                completed: false,
-            },
-            {
-                id: '7',
-                text: 'Маргарита',
-                completed: false,
-            },
-            {
-                id: '8',
-                text: 'Карбонара',
-                completed: false,
-            },
-        ]
-    },
-])
+const store = useNotesStore()
+const toast = useToast()
 
-const onCreate = (): void => {
-    navigateTo(`/notes/new`)
+const noteToDelete = ref<Note | null>(null)
+
+const deleteDialogOpen = computed({
+  get: () => noteToDelete.value !== null,
+  set: (value: boolean) => {
+    if (!value) noteToDelete.value = null
+  },
+})
+
+const deleteMessage = computed(() => {
+  const title = noteToDelete.value?.title.trim() || 'Без названия'
+  return `Заметка «${title}» будет удалена безвозвратно.`
+})
+
+function onCreate(): void {
+  const note = store.createNote()
+  navigateTo(`/notes/${note.id}`)
 }
 
+function onEdit(note: Note): void {
+  navigateTo(`/notes/${note.id}`)
+}
+
+function onDeleteRequest(note: Note): void {
+  noteToDelete.value = note
+}
+
+function onDeleteConfirm(): void {
+  if (!noteToDelete.value) return
+  store.removeNote(noteToDelete.value.id)
+  toast.show('Заметка удалена', 'success')
+  noteToDelete.value = null
+}
 </script>
 
 <template>
@@ -138,10 +49,31 @@ const onCreate = (): void => {
             </Button>
         </header>
         <main class="mainpage__main">
-            <div v-if="notes.length > 0" class="grid">
-                <NoteCard v-for="note in notes" :key="note.id" :note="note" />
+            <div v-if="store.notes.length > 0" class="grid">
+                <NoteCard 
+                    v-for="note in store.notes"
+                    :key="note.id"
+                    :note="note"
+                    @edit="onEdit"
+                    @delete="onDeleteRequest"
+                />
             </div>
+
+            <EmptyState
+                v-else
+                title="Пока нет заметок"
+                description="Создайте первую заметку"
+            ></EmptyState>
         </main>
+
+        <ConfirmDialog
+        v-model="deleteDialogOpen"
+        title="Удалить заметку?"
+        :message="deleteMessage"
+        confirm-text="Удалить"
+        danger
+        @confirm="onDeleteConfirm"
+        />
     </div>
 </template>
 

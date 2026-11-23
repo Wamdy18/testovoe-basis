@@ -10,6 +10,11 @@ const props = withDefaults(defineProps<{
     maxTodos: 5,
 })
 
+const emit = defineEmits<{
+  edit: [note: Note]
+  delete: [note: Note]
+}>()
+
 const previewTodos = computed(() => props.note.todos.slice(0, props.maxTodos))
 const remaining = computed(() => Math.max(0, props.note.todos.length - props.maxTodos))
 </script>
@@ -21,7 +26,7 @@ const remaining = computed(() => Math.max(0, props.note.todos.length - props.max
                 {{ note.title.trim() || 'Без названия' }}
             </h3>
             <div class="card__actions">
-                <button class="card__action" @click="() => {}">
+                <button class="card__action" @click="emit('edit', note)">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                         <path
                         d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16v4Z"
@@ -32,7 +37,7 @@ const remaining = computed(() => Math.max(0, props.note.todos.length - props.max
                         <path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.6" />
                     </svg>
                 </button>
-                <button class="card__action card__action--danger" @click="() => {}">
+                <button class="card__action card__action--danger" @click="emit('delete', note)">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                         <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m3 0-1 13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
@@ -43,7 +48,7 @@ const remaining = computed(() => Math.max(0, props.note.todos.length - props.max
             <ul v-if="previewTodos.length > 0" class="card__todos">
                 <li v-for="todo in previewTodos" :key="todo.id" class="card__todo">
                     <span class="card__mark" :class="{ 'card__mark--done': todo.completed }" >
-                        <svg v-if="todo.completed"viewBox="0 0 12 10" width="10" height="10" fill="none">
+                        <svg v-if="todo.completed" viewBox="0 0 12 10" width="10" height="10" fill="none">
                             <path d="M1 5.2 4.3 8.5 11 1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
                     </span>
