@@ -119,13 +119,18 @@ const notes = reactive([
         ]
     },
 ])
+
+const onCreate = (): void => {
+    navigateTo(`/notes/new`)
+}
+
 </script>
 
 <template>
     <div class="mainpage">
         <header class="mainpage__header">
             <h1>Заметки</h1>
-            <Button>
+            <Button @click="onCreate">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                     <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                 </svg>

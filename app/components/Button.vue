@@ -42,7 +42,7 @@
   cursor: pointer;
   white-space: nowrap;
 
-  padding: 9px 16px;
+  padding: var(--button-padding);
   font-size: 14px;
 
   &:disabled {
@@ -67,8 +67,9 @@
   }
 
   &--secondary {
-    background: var(--color-secondary);
-    color: #fff;
+    background: #fff;
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
 
     &:hover:not(:disabled) {
       background: var(--color-secondary-hover);
